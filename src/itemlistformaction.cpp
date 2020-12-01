@@ -1040,10 +1040,22 @@ std::string ItemListFormAction::item2formatted_line(const ItemPtrPosPair& item,
 	fmt.register_fmt('n', item.first->unread() ? "N" : " ");
 	fmt.register_fmt('d', item.first->deleted() ? "D" : " ");
 	fmt.register_fmt('F', item.first->flags());
-	fmt.register_fmt('D',
-		utils::mt_strf_localtime(
-			datetime_format,
-			item.first->pubDate_timestamp()));
+
+	const auto is_found = datetime_format.find("%L");
+	if (is_found != std::string::npos) {
+		auto article_epoch = std::stol(
+				utils::mt_strf_localtime("%s", item.first->pubDate_timestamp()));
+		auto current_epoch = std::chrono::duration_cast<std::chrono::seconds>(
+				std::chrono::system_clock::now().time_since_epoch()).count();
+		auto days = (current_epoch - article_epoch) / 86400;
+		const std::string new_datetime_format = utils::replace_all(
+				datetime_format, "%L", _("%u days ago"));
+		fmt.register_fmt('D', strprintf::fmt(new_datetime_format, days));
+	} else {
+		fmt.register_fmt('D', utils::mt_strf_localtime(datetime_format,
+				item.first->pubDate_timestamp()));
+	}
+
 	if (feed->rssurl() != item.first->feedurl() &&
 		item.first->get_feedptr() != nullptr) {
 		auto feedtitle = item.first->get_feedptr()->title();
